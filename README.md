@@ -11,4 +11,4 @@ Mathematical generative art created from true randomness and entropy sources.
 -Entropy from timing jitter, microphone, and camera
 
 ## Live Demo
-https://adi-current.github.io/chaos-canvas/
+https://adi-current.github.io/Chaos_Canvas/
