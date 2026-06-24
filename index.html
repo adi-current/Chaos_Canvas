@@ -24,9 +24,12 @@
   --elite:'Special Elite',serif;
   --mono:'Space Mono',monospace;
 }
-*{box-sizing:border-box;margin:0;padding:0;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--board);color:var(--chalk);}
-.shell{display:flex;height:100vh;overflow:hidden;}
+/* 100dvh accounts for mobile browser chrome (address bar) so the layout
+   doesn't get clipped/jumpy on phones; falls back to 100vh on older browsers
+   because an unsupported value is simply ignored, leaving the line above. */
+.shell{display:flex;height:100vh;height:100dvh;overflow:hidden;}
 
 /* ── SIDEBAR ── */
 .sidebar{
@@ -287,7 +290,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--board);color:v
   border:1px solid rgba(240,234,216,0.06);
   border-radius:3px;pointer-events:none;
 }
-canvas{display:block;width:100%;aspect-ratio:16/10;background:#05050a;}
+canvas{display:block;width:100%;aspect-ratio:16/10;background:#05050a;max-height:100%;touch-action:manipulation;}
 
 /* caption — hand-written below */
 .caption{
@@ -303,6 +306,151 @@ canvas{display:block;width:100%;aspect-ratio:16/10;background:#05050a;}
 .cap-meta{
   font-family:var(--mono);font-size:9px;
   color:var(--chalk4);letter-spacing:0.04em;
+}
+
+/* ===================================================================
+   RESPONSIVE / MOBILE LAYOUT
+   The desktop layout is two fixed-width flex columns (272px sidebar +
+   fluid canvas). On narrow screens that math doesn't work, so on
+   phones/small tablets we rebuild the bottom panel as a *horizontal*
+   toolbar instead of a tall vertical list:
+     1) Tablets/small laptops (≤1024px): just shrink the sidebar.
+     2) Phones (≤860px, portrait): flip visual order so the artwork is
+        the first thing on screen, then a slim horizontal control strip
+        below it. The strip scrolls sideways (not up/down) and is
+        ordered so the 4 algorithm buttons + Generate are the first 5
+        items — visible at a glance with no scrolling — while Export
+        SVG/PNG, Record, Entropy and Seed sit just off the right edge,
+        one swipe away.
+     3) Phones (landscape, short viewport): kept side-by-side, since a
+        narrow-but-tall sidebar already suits a vertical list there.
+     4) The "chalk dust" speckle background (the dot texture) is turned
+        off below 860px — it reads as a charming blackboard texture at
+        full size, but at phone scale it just looks like noise/dirt.
+   =================================================================== */
+
+/* Small laptops / tablets in landscape: narrower sidebar, same layout */
+@media (max-width:1024px){
+  .sidebar{width:240px;}
+  .canvas-area{padding:28px 22px;}
+}
+
+/* Kill the dot-speckle texture on any mobile-sized screen (portrait or
+   landscape) — this is what was reading as "green dots everywhere".
+   The faint ruled lines stay; they don't have the same noisy effect. */
+@media (max-width:860px){
+  .sidebar::before,.canvas-area::after{display:none;}
+}
+
+/* Phones & small tablets in portrait: canvas on top, horizontal toolbar below */
+@media (max-width:860px) and (orientation:portrait){
+  .shell{flex-direction:column;height:100vh;height:100dvh;}
+
+  /* Artwork first */
+  .canvas-area{
+    order:1;flex:1 1 auto;width:100%;height:auto;min-height:0;
+    padding:14px 12px 8px;
+  }
+  .canvas-wrap{max-width:100%;}
+
+  /* Control strip second — sized to content, not a vh cap, since it's
+     now one shallow row instead of a tall stacked list */
+  .sidebar{
+    order:2;width:100%;height:auto;max-height:none;flex-shrink:0;
+    border-right:none;border-bottom:1px solid var(--green-line);
+  }
+  .sb-head{padding:10px 14px 8px;}
+  .wordmark{font-size:20px;}
+  .tagline{display:none;} /* not needed once the canvas is doing the talking */
+
+  /* The horizontal scroller. overflow-x (not -y) is the whole point here. */
+  .sb-body{
+    display:flex;flex-direction:row;align-items:stretch;
+    overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+    padding:8px 10px;gap:8px;
+  }
+  .sb-section{
+    display:flex;flex-direction:row;align-items:center;
+    margin-bottom:0;padding:0;gap:6px;flex-shrink:0;
+  }
+  .sb-label{display:none;} /* section captions aren't needed in a compact strip */
+
+  /* Reorder sections so the first 5 visible items are the 4 algorithm
+     buttons + Generate. Source order in the markup is
+     Algorithm → Entropy → Seed → Buttons, so we move Buttons up. */
+  .sb-body>.sb-section:nth-of-type(1){order:1;} /* Algorithm */
+  .sb-body>.sb-section:nth-of-type(4){order:2;} /* Generate / Export / Export / Record */
+  .sb-body>.sb-section:nth-of-type(2){order:3;} /* Entropy */
+  .sb-body>.sb-section:nth-of-type(3){order:4;} /* Seed */
+
+  /* Algorithm buttons: compact vertical card, ~1/5 of viewport wide each
+     so 4 of them + Generate fill the screen exactly with no scroll. */
+  .algo-list{display:flex;flex-direction:row;gap:6px;}
+  .algo-btn{
+    flex-direction:column;justify-content:center;text-align:center;
+    width:calc(20vw - 8px);min-width:58px;flex-shrink:0;
+    padding:8px 4px;gap:3px;
+  }
+  .algo-btn .algo-desc{display:none;} /* subtitle dropped — no room, and the icon+name is enough to identify it */
+  .algo-num{font-size:12px;}
+  .algo-name{font-size:11.5px;line-height:1.15;}
+
+  /* Buttons section: Generate matches the algo-button width (so it's
+     the visual "5th tile"); Export/Record are normal-width and sit
+     just past the fold, reachable by swiping right. */
+  .sb-body>.sb-section:nth-of-type(4) .act{
+    flex-direction:column;width:auto;margin-bottom:0;
+    padding:8px 6px;gap:3px;font-size:11px;white-space:normal;
+    text-align:center;flex-shrink:0;
+  }
+  .sb-body>.sb-section:nth-of-type(4) .act svg{width:16px;height:16px;}
+  #btnGenerate{width:calc(20vw - 8px);min-width:58px;}
+  #btnExportSvg,#btnExportPng,#btnRecord{width:84px;min-width:84px;}
+
+  /* Entropy + Seed: still reachable by swipe, just compacted */
+  .sb-body>.sb-section:nth-of-type(2){gap:10px;}
+  .ent-row{flex-direction:column;border-bottom:none;gap:3px;padding:0;}
+  .ent-name{flex-direction:column;font-size:9px;gap:2px;}
+  .ent-pill{font-size:11px;padding:4px 8px;}
+  .ent-auto{font-size:9px;}
+  .seed-box{flex-direction:column;padding:6px 10px;gap:2px;}
+  .seed-val{font-size:11px;}
+
+  .sb-foot{
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    padding:5px 14px;font-size:11px;
+  }
+
+  .canvas-top{margin-bottom:6px;}
+  .edition{font-size:14px;}
+  .dims{font-size:8px;}
+  .caption{margin-top:8px;padding-top:6px;}
+  .cap-title{font-size:15px;}
+  .cap-meta{font-size:8px;}
+}
+
+/* Phones in landscape with limited height: side-by-side reads better
+   here than stacking, since width is abundant and height is tight —
+   the vertical algorithm list suits a narrow-but-tall sidebar fine. */
+@media (max-width:860px) and (orientation:landscape) and (max-height:520px){
+  .shell{flex-direction:row;height:100vh;height:100dvh;}
+  .sidebar{
+    width:200px;height:100vh;height:100dvh;max-height:none;
+    border-right:1px solid var(--green-line);border-bottom:none;
+  }
+  .sb-head{padding:14px 14px 10px;}
+  .wordmark{font-size:22px;}
+  .tagline{display:none;} /* reclaim vertical space; not essential on a cramped landscape strip */
+  .sb-section{margin-bottom:12px;}
+  .canvas-area{height:100vh;height:100dvh;padding:14px;}
+}
+
+/* Ensure every interactive control has touch-friendly hit areas and
+   doesn't trigger the double-tap-to-zoom delay on touch devices. */
+@media (hover:none) and (pointer:coarse){
+  .act,.algo-btn,.ent-pill,#btnGenerate,#btnExportSvg,#btnExportPng,#btnRecord{
+    touch-action:manipulation;
+  }
 }
 </style>
 </head>
@@ -464,7 +612,18 @@ pngBtn.addEventListener("click",()=>{canvas.toBlob(b=>{dl(b,`chaos-canvas-${curr
 recBtn.addEventListener("click",()=>{if(currentAlgo!=="flowfield"){setStatus("Timelapse is for Flow Field only.");return;}if(!canvas.captureStream||typeof MediaRecorder==="undefined"){setStatus("Recording not supported here.");return;}const s=canvas.captureStream(30);let rec;try{rec=new MediaRecorder(s,{mimeType:"video/webm;codecs=vp9"});}catch(e){rec=new MediaRecorder(s);}const ch=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)ch.push(e.data);};rec.onstop=()=>{dl(new Blob(ch,{type:"video/webm"}),`chaos-canvas-timelapse-${Date.now()}.webm`);setStatus("Timelapse saved.");};rec.start();currentRecorder=rec;setStatus("● Recording — generate to capture.");});
 micBtn.addEventListener("click",async()=>{try{setStatus("Listening for ambient noise…");const b=await collectMicrophoneNoise();entropyPool=entropyPool.concat(b);dotMic.classList.add("on");micBtn.classList.add("on");setStatus("Microphone noise added.");}catch(e){setStatus("Mic error: "+e.message);}});
 camBtn.addEventListener("click",async()=>{try{setStatus("Sampling camera sensor…");const b=await collectCameraNoise();entropyPool=entropyPool.concat(b);dotCam.classList.add("on");camBtn.classList.add("on");setStatus("Camera noise added.");}catch(e){setStatus("Camera error: "+e.message);}});
-window.addEventListener("resize",()=>{resizeCanvas();run(lastSeed);});
+let resizeRAF=null;
+function handleViewportChange(){
+  if(resizeRAF)cancelAnimationFrame(resizeRAF);
+  // rAF lets the browser finish its own layout reflow (rotation/keyboard/etc.)
+  // before we measure the canvas, avoiding a stale getBoundingClientRect read.
+  resizeRAF=requestAnimationFrame(()=>{resizeCanvas();run(lastSeed);});
+}
+window.addEventListener("resize",handleViewportChange);
+// iOS Safari in particular can fire "resize" late or not at all on rotation,
+// so we also listen for orientationchange directly, with a short delay to
+// let the new viewport dimensions settle.
+window.addEventListener("orientationchange",()=>{setTimeout(handleViewportChange,150);});
 document.addEventListener("keydown",e=>{if(e.key===" "){e.preventDefault();genBtn.click();}});
 updateBtns();generate();
 })();
